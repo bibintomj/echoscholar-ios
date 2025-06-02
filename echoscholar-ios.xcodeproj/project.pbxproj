@@ -6,11 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		1C5526D32DED57480073C293 /* NetSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 1C5526D22DED57480073C293 /* NetSwift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		1C7E79432DDB9D4200C42589 /* echoscholar-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "echoscholar-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		1C5526DC2DED5A0F0073C293 /* Packages */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Packages;
+			sourceTree = "<group>";
+		};
 		1C7E79452DDB9D4200C42589 /* echoscholar-ios */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "echoscholar-ios";
@@ -23,16 +32,26 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1C5526D32DED57480073C293 /* NetSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1C5526D12DED57480073C293 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		1C7E793A2DDB9D4200C42589 = {
 			isa = PBXGroup;
 			children = (
+				1C5526DC2DED5A0F0073C293 /* Packages */,
 				1C7E79452DDB9D4200C42589 /* echoscholar-ios */,
+				1C5526D12DED57480073C293 /* Frameworks */,
 				1C7E79442DDB9D4200C42589 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -61,10 +80,12 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				1C5526DC2DED5A0F0073C293 /* Packages */,
 				1C7E79452DDB9D4200C42589 /* echoscholar-ios */,
 			);
 			name = "echoscholar-ios";
 			packageProductDependencies = (
+				1C5526D22DED57480073C293 /* NetSwift */,
 			);
 			productName = "echoscholar-ios";
 			productReference = 1C7E79432DDB9D4200C42589 /* echoscholar-ios.app */;
@@ -255,9 +276,12 @@
 				DEVELOPMENT_TEAM = W8H3W4BZ8S;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = EchoScholar;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen.storyboard;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -284,9 +308,12 @@
 				DEVELOPMENT_TEAM = W8H3W4BZ8S;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = EchoScholar;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen.storyboard;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -324,6 +351,13 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1C5526D22DED57480073C293 /* NetSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NetSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1C7E793B2DDB9D4200C42589 /* Project object */;
 }

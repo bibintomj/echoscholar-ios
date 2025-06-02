@@ -6,12 +6,21 @@
 //
 
 import SwiftUI
+import NetSwift
 
 @main
 struct echoscholar_iosApp: App {
+    @StateObject private var appState = AppState()
+    
+    init() {
+        guard !isSwiftUIPreview else { return }
+        SessionManager.shared.restore()
+    }
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environmentObject(appState)
         }
     }
 }
