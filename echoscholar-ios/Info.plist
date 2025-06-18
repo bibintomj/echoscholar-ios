@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.bibintomj.echoscholar-ios</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>echoscholar</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>GIDClientID</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.456927260914-leli014hq9i53dm4ge46qgm8qa2k55nu</string>
+			</array>
+		</dict>
+	</array>
+	<key>GIDClientID</key>
+	<string>456927260914-leli014hq9i53dm4ge46qgm8qa2k55nu.apps.googleusercontent.com</string>
+</dict>
+</plist>

@@ -25,7 +25,8 @@ class AppState: ObservableObject {
 
     init() {
         self.isOnboarded = UserDefaults.standard.bool(forKey: "isOnboarded")
-        self.setUpInitialView()
+//        self.setUpInitialView()
+        self.setUpViewDefaults()
     }
 
     // Get or create ViewModel
@@ -49,6 +50,22 @@ class AppState: ObservableObject {
 
     private func setUpInitialView() {
         navigationPath.append(Route.login)
+    }
+    
+    private func setUpViewDefaults() {
+        UISegmentedControl.appearance().selectedSegmentTintColor = .accent
+
+        // Selected text color
+        UISegmentedControl.appearance().setTitleTextAttributes(
+            [.foregroundColor: UIColor.brandDarkPrimary],
+            for: .selected
+        )
+
+        // Unselected text color
+//        UISegmentedControl.appearance().setTitleTextAttributes(
+//            [.foregroundColor: UIColor.accent],
+//            for: .normal
+//        )
     }
 
     // Pops all routes

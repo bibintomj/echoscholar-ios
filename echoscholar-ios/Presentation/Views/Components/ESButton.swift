@@ -51,7 +51,7 @@ struct LButton: View {
     // Customization options
     var horizontalPadding: CGFloat = 16
     var verticalPadding: CGFloat = 12
-    var cornerRadius: CGFloat = 100
+    var cornerRadius: CGFloat = 20
     var borderWidth: CGFloat = 0.5
     var minWidth: CGFloat? = 44
     var minHeight: CGFloat? = 32
@@ -68,11 +68,23 @@ struct LButton: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: type.foregroundColor))
                 } else {
                     if let icon = icon {
-                        Image(systemName: icon)
-                            .font(.system(size: iconSize, weight: .semibold))
+                        // Try to use the icon as an SF Symbol
+                        if UIImage(systemName: icon) != nil {
+                            // It's an SF Symbol
+                            Image(systemName: icon)
+                                .font(.system(size: iconSize, weight: .semibold))
+                        } else {
+                            // It's a custom asset image
+                            Image(icon)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: iconSize, height: iconSize)
+                        }
                     }
+
                     if let title {
                         Text(title)
+                            .bold()
 //                            .customFont(.primary, .headline)
                     }
                 }
@@ -83,6 +95,7 @@ struct LButton: View {
             .foregroundColor(type.foregroundColor)
             .background(type.backgroundColor)
             .cornerRadius(cornerRadius)
+            .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(type.borderColor, lineWidth: borderWidth)
