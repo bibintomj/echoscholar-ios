@@ -26,18 +26,19 @@ struct RootView: View {
                                 .animation(.easeInOut(duration: 0.5), value: appState.isFadingOut)
                         }
                 }
+                .environmentObject(appState)
         }
         .tint(.accent)
-        
+        .environmentObject(appState)
     }
 
     @ViewBuilder
     private func viewForRoute(_ route: Route) -> some View {
         switch route {
         case .login: LoginView()
-        case .sessionList: EmptyView()
+        case .sessionList: SessionListView()
         case .sessionDetail: EmptyView()
-        case .newSession: EmptyView()
+        case .newSession: NewSessionView()
         case .account: EmptyView()
 //        case .splash: SplashView()
 //        case .onboarding: OnboardView()

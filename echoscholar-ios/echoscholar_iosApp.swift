@@ -22,7 +22,6 @@ struct echoscholar_iosApp: App {
     init() {
         guard !isSwiftUIPreview else { return }
         SessionManager.shared.restore()
-        print("Session", supabase.auth.currentUser)
     }
     
     var body: some Scene {

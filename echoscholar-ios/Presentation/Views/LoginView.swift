@@ -9,14 +9,16 @@ import SwiftUI
 import GoogleSignIn
 import GoogleSignInSwift
 import Supabase
+import NetSwift
 
 struct LoginView: View {
+    @EnvironmentObject var appState: AppState
     @State private var email = "abc@mail.com"
     @State private var password = "Pass@123"
     @State private var isLoadingEmail = false
     @State private var isLoadingGoogle = false
     @State private var loginError: String?
-    
+
     var body: some View {
         ZStack {
             Color("background.primary")
@@ -67,7 +69,7 @@ struct LoginView: View {
                 }
                 .padding(.horizontal)
                 
-                LButton(
+                ESButton(
                     title: "Login",
                     icon: nil,
                     type: .primary,
@@ -86,7 +88,7 @@ struct LoginView: View {
                 }
                 .padding(.horizontal)
                 
-                LButton(
+                ESButton(
                     title: "Login with Google",
                     icon: "google.logo",
                     type: .secondary,
@@ -108,6 +110,11 @@ struct LoginView: View {
             }
             .padding()
         }
+        .onAppear {
+            if supabase.auth.currentUser != nil {
+                navigateToHome()
+            }
+        }
     }
     
     func loginWithEmail() {
@@ -117,6 +124,10 @@ struct LoginView: View {
             do {
                 let session = try await supabase.auth.signIn(email: email, password: password)
                 print("✅ Logged in with session: \(session)")
+                let accessToken = session.accessToken
+                let refreshToken = session.refreshToken
+                await SessionManager.shared.setTokens(accessToken: accessToken, refreshToken: refreshToken)
+                navigateToHome()
             } catch {
                 loginError = "Login failed: \(error.localizedDescription)"
                 print("❌ Email login error: \(error)")
@@ -142,20 +153,30 @@ struct LoginView: View {
                 }
                 print("idToken>>>", idToken)
                 let accessToken = result.user.accessToken.tokenString
+                let refreshToken = result.user.refreshToken.tokenString
                 print("accessToken>>>", accessToken)
                 try await supabase.auth.signInWithIdToken(
                     credentials: OpenIDConnectCredentials(
                         provider: .google,
                         idToken: idToken,
-                        accessToken: accessToken,
+                        accessToken: accessToken
                     )
                 )
+                
+                await SessionManager.shared.setTokens(accessToken: accessToken, refreshToken: refreshToken)
                 print("✅ Signed in with Google & Supabase")
+                navigateToHome()
             } catch {
                 print("❌ Sign in failed: \(error)")
             }
             isLoadingGoogle = false
         }
+    }
+    
+    func navigateToHome() {
+        isLoadingEmail = false
+        isLoadingEmail = false
+        appState.navigateTo(.sessionList)
     }
 }
 

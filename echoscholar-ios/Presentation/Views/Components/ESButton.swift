@@ -39,7 +39,7 @@ enum ButtonType {
     }
 }
 
-struct LButton: View {
+struct ESButton: View {
     let title: String?
     let icon: String?
     let type: ButtonType
