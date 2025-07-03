@@ -163,7 +163,10 @@ struct LoginView: View {
                     )
                 )
                 
-                await SessionManager.shared.setTokens(accessToken: accessToken, refreshToken: refreshToken)
+                print("Supabase access token", supabase.auth.currentSession?.accessToken)
+                
+                await SessionManager.shared.setTokens(accessToken: supabase.auth.currentSession?.accessToken ?? accessToken,
+                                                      refreshToken: supabase.auth.currentSession?.refreshToken ?? refreshToken)
                 print("✅ Signed in with Google & Supabase")
                 navigateToHome()
             } catch {

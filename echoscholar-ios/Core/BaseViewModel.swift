@@ -2,7 +2,7 @@
 //  BaseViewModel.swift
 //  Lixor
 //
-//  Created by Inhyuck Kim on 2025-03-25.
+//  Created by Bibin Tom Kim on 2025-03-25.
 //
 
 import SwiftUI

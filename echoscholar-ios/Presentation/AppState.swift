@@ -16,15 +16,20 @@ class AppState: ObservableObject {
     
     // ViewModel storage
     private var viewModels: [ObjectIdentifier: Any] = [:]
+    
+    static var hostURLString: String { "http://localhost:3000/api" }
 
+    let sessionService: SessionService
+    
     @Published var isOnboarded: Bool {
         didSet {
             UserDefaults.standard.set(isOnboarded, forKey: "isOnboarded")
         }
     }
 
-    init() {
+    init(sessionService: SessionService = SessionService()) {
         self.isOnboarded = UserDefaults.standard.bool(forKey: "isOnboarded")
+        self.sessionService = sessionService
 //        self.setUpInitialView()
         self.setUpViewDefaults()
     }

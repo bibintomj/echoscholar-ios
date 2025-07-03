@@ -7,38 +7,38 @@
 
 import SwiftUI
 import Helpers
-
-import SwiftUI
-import Helpers
 import Supabase
 
 struct SessionListView: View {
     @EnvironmentObject var appState: AppState
-    @State private var sessions: [Session] = []
-    @State private var isLoading = true
-    @State private var showError = false
-
+    
+    @StateObject var viewModel: SessionViewModel
+    
+    init(viewModel: SessionViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+    
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Color("background.primary")
                 .ignoresSafeArea()
             
-            if isLoading {
+            if viewModel.isLoading {
                 ProgressView("Loading sessions...")
                     .foregroundColor(.white)
             } else {
                 List {
-                    ForEach(sessions) { session in
+                    ForEach(viewModel.sessions) { session in
                         HStack(spacing: 12) {
                             Image(systemName: "play.circle.fill")
                                 .resizable()
                                 .frame(width: 50, height: 50)
                             
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(session.title)
+                                Text(session.transcriptions?.first?.content.prefix(20) ?? "Untitled")
                                     .font(.headline)
                                 
-                                Text(session.timestampText)
+                                Text(formatTimestamp(session.transcriptions?.first?.createdOn))
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
@@ -50,7 +50,12 @@ struct SessionListView: View {
                         }
                         .padding(.vertical, 8)
                         .listRowBackground(Color.backgroundTertiary)
+                        .onTapGesture {
+                            viewModel.selectedSession = session
+                            appState.navigateTo(.sessionDetail)
+                        }
                     }
+                    
                 }
                 .scrollContentBackground(.hidden)
             }
@@ -97,69 +102,12 @@ struct SessionListView: View {
             }
         }
         .onAppear {
-            loadSessions()
-        }
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Failed to load sessions.")
+            viewModel.loadSessions()
         }
     }
-
-    private func loadSessions() {
-        isLoading = true
-        Task {
-            do {
-                guard let accessToken = supabase.auth.currentSession?.accessToken else {
-                    throw NSError(domain: "No token", code: 401)
-                }
-
-                var request = URLRequest(url: URL(string: "http://localhost:3000/api/session")!)
-                request.httpMethod = "GET"
-                request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-
-                let (data, response) = try await URLSession.shared.data(for: request)
-
-                guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                    throw NSError(domain: "Invalid response", code: 500)
-                }
-
-                // Debug: print raw JSON string
-                if let jsonString = String(data: data, encoding: .utf8) {
-                    print("📦 Raw JSON Response:\n\(jsonString)")
-                }
-
-                let decoded = try JSONDecoder().decode(SessionResponse.self, from: data)
-
-                // Debug: print full decoded object
-                print("✅ Decoded Sessions:\n\(decoded)")
-
-                // Map to display model
-                sessions = decoded.sessions.map {
-                    let title: String
-
-                    if let firstTranscription = $0.transcriptions?.first?.content {
-                        title = firstTranscription
-                            .split(separator: "\n")
-                            .first
-                            .map(String.init) ?? "Untitled"
-                    } else {
-                        title = "Untitled"
-                    }
-
-                    return Session(title: title, timestampText: formatTimestamp($0.created_on))
-                }
-
-
-            } catch {
-                print("❌ Failed to load sessions: \(error)")
-                showError = true
-            }
-
-            isLoading = false
-        }
-    }
-
+    
+    
+    
     private func logout() {
         Task {
             do {
@@ -170,44 +118,17 @@ struct SessionListView: View {
             }
         }
     }
-
-    private func formatTimestamp(_ timestamp: String) -> String {
-        // Example: Convert ISO to friendly string
-        let isoFormatter = ISO8601DateFormatter()
-        if let date = isoFormatter.date(from: timestamp) {
-            let formatter = RelativeDateTimeFormatter()
-            return formatter.localizedString(for: date, relativeTo: Date())
-        }
-        return timestamp
+    
+    private func formatTimestamp(_ date: Date?) -> String {
+        guard let date = date else { return "Unknown" }
+        let formatter = RelativeDateTimeFormatter()
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 
-// MARK: - Session Models
-
-struct SessionResponse: Codable {
-    let sessions: [SessionAPIModel]
-}
-
-struct SessionAPIModel: Codable, Identifiable {
-    let id: String
-    let created_on: String
-    let user_id: String
-    let target_language: String
-    let audio_file_path: String
-    let audio_signed_url: String?
-    let translations: [ContentBlock]?
-    let transcriptions: [ContentBlock]?
-    let summaries: [ContentBlock]?
-}
-
-struct ContentBlock: Codable, Identifiable {
-    let id: String
-    let content: String
-    let created_on: String
-}
 
 
 
 #Preview {
-    SessionListView()
+    SessionListView(viewModel: .init())
 }

@@ -39,6 +39,31 @@ public final class NetworkClient {
         self.session = session
         self.requestBuilder = requestBuilder
         self.decoder = decoder
+        self.decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateStr = try container.decode(String.self)
+
+            let formats = [
+                "yyyy-MM-dd'T'HH:mm:ss.SSSZ",   // With timezone
+                "yyyy-MM-dd'T'HH:mm:ss.SSS",    // Without timezone
+                "yyyy-MM-dd'T'HH:mm:ssZ",       // No milliseconds
+                "yyyy-MM-dd'T'HH:mm:ss"         // No milliseconds, no timezone
+            ]
+            
+            for format in formats {
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.dateFormat = format
+                if let date = formatter.date(from: dateStr) {
+                    return date
+                }
+            }
+            
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid date format: \(dateStr)"
+            )
+        }
         self.encoder = encoder
         #if DEBUG
         self.debugLoggingEnabled = true

@@ -36,8 +36,8 @@ struct RootView: View {
     private func viewForRoute(_ route: Route) -> some View {
         switch route {
         case .login: LoginView()
-        case .sessionList: SessionListView()
-        case .sessionDetail: EmptyView()
+        case .sessionList: SessionListView(viewModel: appState.makeSessionViewModel())
+        case .sessionDetail: SessionDetailView(viewModel: appState.makeSessionViewModel())
         case .newSession: NewSessionView()
         case .account: EmptyView()
 //        case .splash: SplashView()
