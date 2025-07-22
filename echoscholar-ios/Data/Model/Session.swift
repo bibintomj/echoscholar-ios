@@ -20,11 +20,11 @@ struct Session: Codable, Identifiable {
     let createdOn: String
     let userId: String
     let targetLanguage: String
-    let audioFilePath: String
+    let audioFilePath: String?
     let audioSignedUrl: String?
-    let translations: [ContentBlock]?
-    let transcriptions: [ContentBlock]?
-    let summaries: [ContentBlock]?
+    let translations: ContentBlock?
+    let transcriptions: ContentBlock?
+    let summaries: ContentBlock?
     
     enum CodingKeys: String, CodingKey {
         case id

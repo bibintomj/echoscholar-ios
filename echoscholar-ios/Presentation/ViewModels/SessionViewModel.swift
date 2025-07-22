@@ -16,6 +16,8 @@ final class SessionViewModel: BaseViewModel {
     @Published var selectedSession: Session?
     @Published var isPlaying = false
     @Published var progress: Double = 0.0
+    @Published var shouldLogout: Bool = false
+    @Published var generatedMoM: String?
     
     init(sessionService: SessionService = SessionService()) {
         self.sessionService = sessionService
@@ -27,6 +29,25 @@ final class SessionViewModel: BaseViewModel {
         Task {
             do {
                 sessions = try await sessionService.getSessions()
+            } catch {
+                if case NetworkError.httpError(let statusCode, _) = error, statusCode == 401 {
+                    shouldLogout = true
+                }
+                if case NetworkError.httpErrorData(let statusCode, _) = error, statusCode == 401 {
+                    shouldLogout = true
+                }
+                handleError(error)
+            }
+            setLoading(false)
+        }
+    }
+    
+    func getMoM() {
+        guard let selectedSession else { return }
+        setLoading(true)
+        Task {
+            do {
+                generatedMoM = try await sessionService.getMoMOfSession(sessionId: selectedSession.id)
             } catch {
                 handleError(error)
             }

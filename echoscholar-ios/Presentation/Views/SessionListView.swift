@@ -35,10 +35,10 @@ struct SessionListView: View {
                                 .frame(width: 50, height: 50)
                             
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(session.transcriptions?.first?.content.prefix(20) ?? "Untitled")
+                                Text(session.transcriptions?.content.prefix(20) ?? "Untitled")
                                     .font(.headline)
                                 
-                                Text(formatTimestamp(session.transcriptions?.first?.createdOn))
+                                Text(formatTimestamp(session.transcriptions?.createdOn))
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
@@ -102,7 +102,13 @@ struct SessionListView: View {
             }
         }
         .onAppear {
-            viewModel.loadSessions()
+            if viewModel.sessions.isEmpty {
+                viewModel.loadSessions()
+            }
+            viewModel.generatedMoM = nil
+        }
+        .onChange(of: viewModel.shouldLogout) { oldValue, newValue in
+            if newValue { logout() }
         }
     }
     

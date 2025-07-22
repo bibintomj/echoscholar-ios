@@ -24,4 +24,14 @@ class SessionService {
             throw error
         }
     }
+    
+    func getMoMOfSession(sessionId: String) async throws -> String {
+        let request = SessionEndpoint.getMoMOfSession(sessionId: sessionId)
+        do {
+            let response: GetMoM.Response = try await networkClient.request(request)
+            return response.mom
+        } catch let error as NetworkError {
+            throw error
+        }
+    }
 }

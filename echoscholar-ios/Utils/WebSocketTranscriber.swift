@@ -6,92 +6,150 @@
 //
 
 import Foundation
-import AVFoundation
 import NetSwift
 
-final class WebSocketTranscriber {
-    private let client: WebSocketClient
-    private let audioEngine = AVAudioEngine()
+class WebSocketTranscriber {
+    private let socket: WebSocketClient
     private let languageCode: String
     private let userId: String
-
+    private var audioProcessor: AudioProcessor?
+    private var isConnected = false
+    private var chunkTimer: Timer?
+    
+    // Callbacks
     var onTranscript: ((String) -> Void)?
     var onTranslation: ((String) -> Void)?
-
+    var onStatusChange: ((String) -> Void)?
+    var onError: ((String) -> Void)?
+    
     init(socket: WebSocketClient, languageCode: String, userId: String) {
-        self.client = socket
+        self.socket = socket
         self.languageCode = languageCode
         self.userId = userId
-
-        client.onReceive = handleIncoming
-        client.onOpen = { [weak self] in
-            self?.sendInitial()
+        setupSocketHandlers()
+    }
+    
+    private func setupSocketHandlers() {
+        socket.onOpen = { [weak self] in
+            self?.handleConnect()
+        }
+        
+        socket.onClose = { [weak self] error in
+            self?.handleDisconnect(error: error)
+        }
+        
+        socket.onReceive = { [weak self] result in
+            switch result {
+            case .success(let data):
+                if let text = String(data: data, encoding: .utf8) {
+                    self?.handleMessage(text)
+                }
+            case .failure(let error):
+                self?.onError?("WebSocket error: \(error.localizedDescription)")
+            }
         }
     }
-
+    
     func connect() {
-        client.connect()
+        socket.connect()
     }
-
+    
     func disconnect() {
-        client.send(text: "END")
-        client.disconnect()
-        stopAudio()
+        chunkTimer?.invalidate()
+        chunkTimer = nil
+        audioProcessor?.cleanup()
+        audioProcessor = nil
+        socket.disconnect()
     }
-
-    private func sendInitial() {
-        let payload: [String: Any] = ["userId": userId, "lang": languageCode]
-        if let data = try? JSONSerialization.data(withJSONObject: payload) {
-            client.send(data: data)
+    
+    private func handleConnect() {
+        isConnected = true
+        onStatusChange?("Connected")
+        
+        // Send initial configuration
+        let config = [
+            "type": "config",
+            "language": languageCode,
+            "userId": userId,
+            "format": "webm_opus"
+        ]
+        
+        if let configData = try? JSONSerialization.data(withJSONObject: config),
+           let configString = String(data: configData, encoding: .utf8) {
+            socket.send(text: configString)
         }
+        
+        startAudioProcessing()
     }
-
-    private func handleIncoming(result: Result<Data, Error>) {
-        guard case .success(let data) = result else { return }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
-
-        if json["type"] as? String == "READY" {
-            startAudio()
-        } else {
-            if let t = json["transcription"] as? String {
-                onTranscript?(t)
+    
+    private func handleDisconnect(error: Error?) {
+        isConnected = false
+        chunkTimer?.invalidate()
+        chunkTimer = nil
+        audioProcessor?.cleanup()
+        audioProcessor = nil
+        
+        if let error = error {
+            onError?("Connection lost: \(error.localizedDescription)")
+        }
+        onStatusChange?("Disconnected")
+    }
+    
+    private func handleMessage(_ message: String) {
+        guard let data = message.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let type = json["type"] as? String else {
+            return
+        }
+        
+        switch type {
+        case "transcript":
+            if let text = json["text"] as? String {
+                onTranscript?(text)
             }
-            if let tr = json["translation"] as? String {
-                onTranslation?(tr)
+        case "translation":
+            if let text = json["text"] as? String {
+                onTranslation?(text)
+            }
+        case "error":
+            if let message = json["message"] as? String {
+                onError?(message)
+            }
+        default:
+            break
+        }
+    }
+    
+    func startAudioProcessing() {
+        audioProcessor = AudioProcessor()
+        audioProcessor?.startRecording { [weak self] result in
+            switch result {
+            case .success():
+                self?.onStatusChange?("Recording")
+                // Start chunk timer here!
+                self?.chunkTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+                    self?.audioProcessor?.finishCurrentChunkAndStartNext()
+                    self?.audioProcessor?.processPendingChunks { opusData in
+                        // Send opusData to websocket
+                        self?.sendOpusData(opusData)
+                    }
+                }
+            case .failure(let error):
+                self?.onError?("Failed to start recording: \(error.localizedDescription)")
             }
         }
     }
-
-    private func startAudio() {
-        let input = audioEngine.inputNode
-//        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32,
-//                                   sampleRate: 16000,
-//                                   channels: 1,
-//                                   interleaved: false)!
-        let format = input.outputFormat(forBus: 0)
-
-        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
-            guard let self else { return }
-            let data = self.convertBuffer(buffer)
-            self.client.send(data: data)
+    
+    private func sendAudioChunk() {
+        guard isConnected else { return }
+        
+        audioProcessor?.processPendingChunks { [weak self] opusData in
+            self?.sendOpusData(opusData)
         }
-
-
-
-        try? AVAudioSession.sharedInstance().setCategory(.record)
-        try? AVAudioSession.sharedInstance().setActive(true)
-        try? audioEngine.start()
     }
-
-    private func stopAudio() {
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
-    }
-
-    private func convertBuffer(_ buffer: AVAudioPCMBuffer) -> Data {
-        guard let floatChannel = buffer.floatChannelData?[0] else { return Data() }
-        let samples = UnsafeBufferPointer(start: floatChannel, count: Int(buffer.frameLength))
-        let int16Samples = samples.map { Int16(max(-1.0, min(1.0, $0)) * Float(Int16.max)) }
-        return int16Samples.withUnsafeBufferPointer { Data(buffer: $0) }
+    
+    private func sendOpusData(_ data: Data) {
+        // Send binary data directly to WebSocket
+        socket.send(data: data)
     }
 }
