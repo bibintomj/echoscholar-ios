@@ -1,148 +1,170 @@
 import Foundation
 import AVFoundation
-import ffmpegkit
 
 class AudioProcessor {
-    private let tempDirectory: URL
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
-    private var audioFile: AVAudioFile?
-    private var currentWavURL: URL?
-    private var pendingWavURLs: [URL] = []
-
-    init() {
-        tempDirectory = FileManager.default.temporaryDirectory
-    }
+    private var format: AVAudioFormat?
     
-    func startRecording(completion: @escaping (Result<Void, Error>) -> Void) {
+    init() {}
+    
+    func startRecording(onBuffer: @escaping (Data) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
             
             audioEngine = AVAudioEngine()
-            inputNode = audioEngine?.inputNode
-            guard let audioEngine = audioEngine,
-                  let inputNode = inputNode else {
+            guard let audioEngine = audioEngine else {
                 completion(.failure(AudioProcessorError.setupFailed))
                 return
             }
             
-            // Start first chunk
-            startNewRecordingChunk()
+            inputNode = audioEngine.inputNode
+            guard let inputNode = inputNode else {
+                completion(.failure(AudioProcessorError.setupFailed))
+                return
+            }
+            
+            // Use the hardware's native format for the tap
+            let inputFormat = inputNode.inputFormat(forBus: 0)
+            print("Input format: \(inputFormat)")
+            
+            // Create our desired output format (16kHz, mono, 16-bit PCM) - THIS IS THE FIX
+            guard let outputFormat = AVAudioFormat(
+                commonFormat: .pcmFormatInt16,  // Use 16-bit integer format
+                sampleRate: inputFormat.sampleRate,
+                channels: inputFormat.channelCount,
+                interleaved: true
+            ) else {
+                completion(.failure(AudioProcessorError.setupFailed))
+                return
+            }
+            print("Output format: \(outputFormat)")
+            
+            // Create format converter
+            guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
+                completion(.failure(AudioProcessorError.setupFailed))
+                return
+            }
+            
+            // Install tap with hardware's native format
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { (buffer, _) in
+                // Debug: Check if we're getting input data
+                print("Received buffer with \(buffer.frameLength) frames")
+                
+                // Convert to desired format
+                guard let convertedBuffer = self.convertBuffer(buffer, using: converter, to: outputFormat) else {
+                    print("❌ Buffer conversion failed")
+                    return
+                }
+                
+                print("Converted buffer has \(convertedBuffer.frameLength) frames")
+                
+                // Convert to PCM data and send immediately
+                let pcmData = convertedBuffer.toPCMData()
+                print("PCM data size: \(pcmData.count) bytes")
+                
+                if pcmData.count > 0 {
+                    DispatchQueue.main.async {
+                        onBuffer(pcmData)
+                    }
+                } else {
+                    print("⚠️ Empty PCM data generated")
+                }
+            }
+            
             audioEngine.prepare()
             try audioEngine.start()
-            
             completion(.success(()))
         } catch {
+            print("❌ Audio setup error: \(error)")
             completion(.failure(error))
         }
     }
     
-    func startNewRecordingChunk() {
-        guard let audioEngine = audioEngine, let inputNode = inputNode else { return }
-        // Remove previous tap if any
-        inputNode.removeTap(onBus: 0)
-        let wavURL = tempDirectory.appendingPathComponent("recording_\(UUID().uuidString).wav")
-        currentWavURL = wavURL
-        let format = inputNode.outputFormat(forBus: 0)
-        do {
-            audioFile = try AVAudioFile(forWriting: wavURL, settings: format.settings)
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-                do {
-                    try self?.audioFile?.write(from: buffer)
-                } catch {
-                    print("Error writing audio buffer: \(error)")
-                }
-            }
-        } catch {
-            print("Failed to start new chunk: \(error)")
+    private func convertBuffer(_ inputBuffer: AVAudioPCMBuffer, using converter: AVAudioConverter, to outputFormat: AVAudioFormat) -> AVAudioPCMBuffer? {
+        let inputFrameCount = inputBuffer.frameLength
+        
+        // Calculate output frame count more carefully
+        let sampleRateRatio = outputFormat.sampleRate / inputBuffer.format.sampleRate
+        let outputFrameCount = AVAudioFrameCount(Double(inputFrameCount) * sampleRateRatio)
+        
+        guard outputFrameCount > 0 else {
+            print("❌ Invalid output frame count: \(outputFrameCount)")
+            return nil
         }
+        
+        guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: outputFrameCount) else {
+            print("❌ Failed to create output buffer")
+            return nil
+        }
+        
+        var error: NSError?
+        let status = converter.convert(to: outputBuffer, error: &error) { _, outStatus in
+            outStatus.pointee = .haveData
+            return inputBuffer
+        }
+        
+        if let error = error {
+            print("❌ Conversion error: \(error)")
+            return nil
+        }
+        
+        if status == .error {
+            print("❌ Conversion failed with error status")
+            return nil
+        }
+        
+        return outputBuffer
     }
     
-    func finishCurrentChunkAndStartNext() {
-        // 1. Stop current recording
-        inputNode?.removeTap(onBus: 0)
-        audioFile = nil
-
-        // 2. Add last .wav to pending list
-        if let lastURL = currentWavURL {
-            pendingWavURLs.append(lastURL)
-            currentWavURL = nil
-        }
-
-        // 3. Start a new .wav file and install new tap
-        startNewRecordingChunk()
-    }
-
-    func processPendingChunks(onOpusChunk: @escaping (Data) -> Void) {
-        guard !pendingWavURLs.isEmpty else { return }
-        let wavURL = pendingWavURLs.removeFirst()
-        convertToOpusChunk(wavURL: wavURL) { result in
-            switch result {
-            case .success(let opusData):
-                onOpusChunk(opusData) // <--- Send to websocket here
-            case .failure(let error):
-                print("Failed to convert chunk: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    func convertToOpusChunk(wavURL: URL, completion: @escaping (Result<Data, Error>) -> Void) {
-        let webmURL = tempDirectory.appendingPathComponent("converted_\(UUID().uuidString).webm")
-        DispatchQueue.global(qos: .userInitiated).async {
-            guard FileManager.default.fileExists(atPath: wavURL.path) else {
-                DispatchQueue.main.async {
-                    completion(.failure(AudioProcessorError.noRecordingFound))
-                }
-                return
-            }
-            let command = "-y -i \"\(wavURL.path)\" -c:a libopus -b:a 128k -f webm \"\(webmURL.path)\""
-            let session = FFmpegKit.execute(command)
-            let returnCode = session?.getReturnCode()
-            if let code = returnCode, code.isValueSuccess() {
-                do {
-                    let opusData = try Data(contentsOf: webmURL)
-                    try? FileManager.default.removeItem(at: wavURL)
-                    try? FileManager.default.removeItem(at: webmURL)
-                    DispatchQueue.main.async {
-                        completion(.success(opusData))
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        completion(.failure(error))
-                    }
-                }
-            } else {
-                let failCode = returnCode?.getValue() ?? -1
-                DispatchQueue.main.async {
-                    completion(.failure(AudioProcessorError.conversionFailed(code: Int32(failCode))))
-                }
-            }
-        }
-    }
-
     func stopRecording() {
-        audioEngine?.stop()
         inputNode?.removeTap(onBus: 0)
-        audioFile = nil
+        audioEngine?.stop()
+        audioEngine = nil
+        inputNode = nil
+        
         do {
             try AVAudioSession.sharedInstance().setActive(false)
         } catch {
             print("Error deactivating audio session: \(error)")
         }
     }
-    
-    func cleanup() {
-        stopRecording()
-        if let wavURL = currentWavURL {
-            try? FileManager.default.removeItem(at: wavURL)
+}
+
+extension AVAudioPCMBuffer {
+    /// Convert PCM buffer to raw PCM data (16-bit signed little-endian)
+    func toPCMData() -> Data {
+        // Check if buffer has valid data
+        guard self.frameLength > 0 else {
+            print("⚠️ Empty frame length")
+            return Data()
         }
-        // Clean up pending chunks
-        for url in pendingWavURLs {
-            try? FileManager.default.removeItem(at: url)
+        
+        guard let channelData = self.int16ChannelData else {
+            print("⚠️ No int16 channel data available")
+            return Data()
         }
-        pendingWavURLs.removeAll()
+        
+        let channelCount = Int(self.format.channelCount)
+        guard channelCount > 0 else {
+            print("⚠️ Invalid channel count: \(channelCount)")
+            return Data()
+        }
+        
+        let frameLength = Int(self.frameLength)
+        let bytesPerFrame = channelCount * MemoryLayout<Int16>.size
+        let totalBytes = frameLength * bytesPerFrame
+        
+        guard totalBytes > 0 else {
+            print("⚠️ Invalid total bytes: \(totalBytes)")
+            return Data()
+        }
+        
+        // For mono audio, use the first channel
+        let channelPtr = channelData[0]
+        return Data(bytes: channelPtr, count: frameLength * MemoryLayout<Int16>.size)
     }
 }
 

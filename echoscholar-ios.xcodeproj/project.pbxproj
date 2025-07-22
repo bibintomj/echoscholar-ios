@@ -39,6 +39,7 @@
 		1CBA36C32E299EDF00DB98F2 /* libavdevice.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 1CBA369A2E299E1E00DB98F2 /* libavdevice.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1CBA36C42E299EE200DB98F2 /* libavcodec.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1CBA36992E299E1E00DB98F2 /* libavcodec.framework */; };
 		1CBA36C52E299EE200DB98F2 /* libavcodec.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 1CBA36992E299E1E00DB98F2 /* libavcodec.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		1CD835D82E3013B000390E6A /* Starscream in Frameworks */ = {isa = PBXBuildFile; productRef = 1CD835D72E3013B000390E6A /* Starscream */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -139,6 +140,7 @@
 				1C5526D32DED57480073C293 /* NetSwift in Frameworks */,
 				1CA1837A2E007CEA003F4600 /* GoogleSignIn in Frameworks */,
 				1CBA36BA2E299ED900DB98F2 /* libswresample.framework in Frameworks */,
+				1CD835D82E3013B000390E6A /* Starscream in Frameworks */,
 				1CBA36BC2E299EDB00DB98F2 /* libavutil.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -228,6 +230,7 @@
 				1C9881422DF8AD33001E8E39 /* Supabase */,
 				1CA183792E007CEA003F4600 /* GoogleSignIn */,
 				1CA1837B2E007CEA003F4600 /* GoogleSignInSwift */,
+				1CD835D72E3013B000390E6A /* Starscream */,
 			);
 			productName = "echoscholar-ios";
 			productReference = 1C7E79432DDB9D4200C42589 /* echoscholar-ios.app */;
@@ -261,6 +264,7 @@
 				1C9880B92DF89034001E8E39 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 				1CA183782E007CEA003F4600 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				1CBA365C2E29928A00DB98F2 /* XCRemoteSwiftPackageReference "ffmpeg-kit-spm" */,
+				1CD835D62E3013B000390E6A /* XCRemoteSwiftPackageReference "Starscream" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1C7E79442DDB9D4200C42589 /* Products */;
@@ -552,6 +556,14 @@
 				kind = branch;
 			};
 		};
+		1CD835D62E3013B000390E6A /* XCRemoteSwiftPackageReference "Starscream" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/daltoniam/Starscream";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.0.8;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -593,6 +605,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1CA183782E007CEA003F4600 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		1CD835D72E3013B000390E6A /* Starscream */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1CD835D62E3013B000390E6A /* XCRemoteSwiftPackageReference "Starscream" */;
+			productName = Starscream;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

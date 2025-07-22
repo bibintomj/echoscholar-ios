@@ -1,5 +1,5 @@
 {
-  "originHash" : "23b5a9957b0d145e5501e9338d70aae8336f0dad3808263f9388cb1645e9b5e3",
+  "originHash" : "fa57cb80f0b60b188c842c13baa2faafdc4a50e9782a81520fc22b14a7fa5825",
   "pins" : [
     {
       "identity" : "app-check",
@@ -71,6 +71,15 @@
       "state" : {
         "revision" : "540318ecedd63d883069ae7f1ed811a2df00b6ac",
         "version" : "2.4.0"
+      }
+    },
+    {
+      "identity" : "starscream",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/daltoniam/Starscream",
+      "state" : {
+        "revision" : "c6bfd1af48efcc9a9ad203665db12375ba6b145a",
+        "version" : "4.0.8"
       }
     },
     {

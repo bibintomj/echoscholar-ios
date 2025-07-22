@@ -6,17 +6,17 @@
 //
 
 import SwiftUI
-import NetSwift
 import AVFoundation
+import Translation
 
 struct NewSessionView: View {
+    @StateObject private var viewModel = SessionViewModel()
     @State private var transcript = ""
     @State private var translation = ""
     @State private var isRecording = false
-    @State private var selectedLang = "es"
     @State private var status = "Ready"
-    @State private var errorMessage = ""
     @State private var showError = false
+    @State private var errorMessage = ""
     @State private var showPermissionAlert = false
 
     private let languages = [
@@ -24,11 +24,9 @@ struct NewSessionView: View {
         ("fr", "French"),
         ("de", "German"),
         ("hi", "Hindi"),
-        ("zh", "Chinese"),
+        ("zh-Hans", "Chinese"),
         ("ar", "Arabic")
     ]
-    
-    @State private var transcriber: WebSocketTranscriber?
 
     var body: some View {
         VStack(spacing: 20) {
@@ -66,7 +64,7 @@ struct NewSessionView: View {
                     Spacer()
                     
                     // Language picker
-                    Picker("Translate to", selection: $selectedLang) {
+                    Picker("Translate to", selection: $viewModel.selectedLang) {
                         ForEach(languages, id: \.0) { lang in
                             Text(lang.1).tag(lang.0)
                         }
@@ -136,6 +134,29 @@ struct NewSessionView: View {
         }
         .onAppear {
             checkMicrophonePermission()
+            // Setup translation when view appears, but don't force it
+            viewModel.setupInitialTranslation()
+        }
+        // Remove the onChange for selectedLang - let the viewModel handle it
+        .onReceive(viewModel.$transcript) { newTranscript in
+            transcript = newTranscript
+        }
+        .onReceive(viewModel.$translation) { newTranslation in
+            translation = newTranslation
+        }
+        .onReceive(viewModel.$status) { newStatus in
+            status = newStatus
+            if newStatus == "Recording" {
+                isRecording = true
+            } else if newStatus == "Ready" {
+                isRecording = false
+            }
+        }
+        .onReceive(viewModel.$errorMessage) { error in
+            if let error = error {
+                errorMessage = error
+                showError = true
+            }
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -154,7 +175,7 @@ struct NewSessionView: View {
                         
                         // Audio format indicator
                         if isRecording {
-                            Text("WebM Opus")
+                            Text("PCM")
                                 .font(.caption2)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
@@ -164,6 +185,9 @@ struct NewSessionView: View {
                     }
                 }
             }
+        }
+        .translationTask(viewModel.translationConfiguration) { session in
+            await viewModel.translateSequence(session)
         }
     }
     
@@ -206,78 +230,14 @@ struct NewSessionView: View {
             return
         }
         
-        guard let userId = supabase.auth.currentUser?.id else {
-            showError(message: "User not authenticated")
-            return
-        }
-        
         // Reset state
         transcript = ""
         translation = ""
-        status = "Connecting..."
-        
-        // Create WebSocket connection
-        let socket = WebSocketClient(url: URL(string: "ws://" + hostURL + ":8080")!)
-        let newTranscriber = WebSocketTranscriber(
-            socket: socket,
-            languageCode: selectedLang,
-            userId: userId.uuidString
-        )
-
-        // Set up callbacks
-        newTranscriber.onTranscript = { newLine in
-            DispatchQueue.main.async {
-                if !transcript.isEmpty {
-                    transcript += "\n"
-                }
-                transcript += newLine
-            }
-        }
-
-        newTranscriber.onTranslation = { newLine in
-            DispatchQueue.main.async {
-                if !translation.isEmpty {
-                    translation += "\n"
-                }
-                translation += newLine
-            }
-        }
-        
-        newTranscriber.onStatusChange = { newStatus in
-            DispatchQueue.main.async {
-                status = newStatus
-                if newStatus == "Recording" {
-                    isRecording = true
-                }
-            }
-        }
-        
-        newTranscriber.onError = { error in
-            DispatchQueue.main.async {
-                showError(message: error)
-                stopRecording()
-            }
-        }
-
-        transcriber = newTranscriber
-        newTranscriber.connect()
+        viewModel.startRecording()
     }
 
     func stopRecording() {
-        isRecording = false
-        status = "Stopping..."
-        
-        transcriber?.disconnect()
-        transcriber = nil
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            status = "Ready"
-        }
-    }
-    
-    private func showError(message: String) {
-        errorMessage = message
-        showError = true
+        viewModel.stopRecording()
     }
 }
 

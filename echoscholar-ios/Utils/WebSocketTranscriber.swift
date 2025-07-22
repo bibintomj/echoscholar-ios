@@ -2,8 +2,7 @@
 //  WebSocketTranscriber.swift
 //  echoscholar-ios
 //
-//  Created by Bibin Joseph on 2025-06-18.
-//
+//  Created by Bibin Joseph on 2025-06-18
 
 import Foundation
 import NetSwift
@@ -14,30 +13,31 @@ class WebSocketTranscriber {
     private let userId: String
     private var audioProcessor: AudioProcessor?
     private var isConnected = false
-    private var chunkTimer: Timer?
-    
+    private var isRecording = false
+    private var configSent = false
+
     // Callbacks
-    var onTranscript: ((String) -> Void)?
+    var onTranscript: ((String, Bool) -> Void)? // text, isFinal
     var onTranslation: ((String) -> Void)?
     var onStatusChange: ((String) -> Void)?
     var onError: ((String) -> Void)?
-    
+
     init(socket: WebSocketClient, languageCode: String, userId: String) {
         self.socket = socket
         self.languageCode = languageCode
         self.userId = userId
         setupSocketHandlers()
     }
-    
+
     private func setupSocketHandlers() {
         socket.onOpen = { [weak self] in
             self?.handleConnect()
         }
-        
+
         socket.onClose = { [weak self] error in
             self?.handleDisconnect(error: error)
         }
-        
+
         socket.onReceive = { [weak self] result in
             switch result {
             case .success(let data):
@@ -49,107 +49,132 @@ class WebSocketTranscriber {
             }
         }
     }
-    
+
     func connect() {
         socket.connect()
     }
-    
+
     func disconnect() {
-        chunkTimer?.invalidate()
-        chunkTimer = nil
-        audioProcessor?.cleanup()
-        audioProcessor = nil
+        stopRecording()
         socket.disconnect()
     }
-    
+
     private func handleConnect() {
         isConnected = true
         onStatusChange?("Connected")
-        
-        // Send initial configuration
-        let config = [
-            "type": "config",
-            "language": languageCode,
-            "userId": userId,
-            "format": "webm_opus"
+
+        // Send initial configuration that matches your backend expectations
+        let config: [String: Any] = [
+            "lang": languageCode,
+            "userId": userId
         ]
-        
+
         if let configData = try? JSONSerialization.data(withJSONObject: config),
            let configString = String(data: configData, encoding: .utf8) {
+            print("Sending config: \(configString)")
             socket.send(text: configString)
+            configSent = true
         }
-        
-        startAudioProcessing()
     }
-    
+
     private func handleDisconnect(error: Error?) {
         isConnected = false
-        chunkTimer?.invalidate()
-        chunkTimer = nil
-        audioProcessor?.cleanup()
-        audioProcessor = nil
-        
+        configSent = false
+        stopRecording()
+
         if let error = error {
             onError?("Connection lost: \(error.localizedDescription)")
         }
         onStatusChange?("Disconnected")
     }
-    
+
     private func handleMessage(_ message: String) {
+        print("Received message: \(message)")
+        
         guard let data = message.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = json["type"] as? String else {
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            print("Failed to parse message as JSON")
+            return
+        }
+
+        // Handle READY message from backend
+        if let type = json["type"] as? String, type == "READY" {
+            print("Backend is ready, starting recording")
+            startRecording()
             return
         }
         
-        switch type {
-        case "transcript":
-            if let text = json["text"] as? String {
-                onTranscript?(text)
-            }
-        case "translation":
-            if let text = json["text"] as? String {
-                onTranslation?(text)
-            }
-        case "error":
-            if let message = json["message"] as? String {
-                onError?(message)
-            }
-        default:
-            break
+        // Handle transcription and translation from your backend format
+        if let transcription = json["transcription"] as? String {
+            onTranscript?(transcription, true) // Assuming final transcripts
         }
-    }
-    
-    func startAudioProcessing() {
-        audioProcessor = AudioProcessor()
-        audioProcessor?.startRecording { [weak self] result in
-            switch result {
-            case .success():
-                self?.onStatusChange?("Recording")
-                // Start chunk timer here!
-                self?.chunkTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-                    self?.audioProcessor?.finishCurrentChunkAndStartNext()
-                    self?.audioProcessor?.processPendingChunks { opusData in
-                        // Send opusData to websocket
-                        self?.sendOpusData(opusData)
-                    }
-                }
-            case .failure(let error):
-                self?.onError?("Failed to start recording: \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    private func sendAudioChunk() {
-        guard isConnected else { return }
         
-        audioProcessor?.processPendingChunks { [weak self] opusData in
-            self?.sendOpusData(opusData)
+        if let translation = json["translation"] as? String {
+            onTranslation?(translation)
+        }
+        
+        // Handle error messages
+        if let error = json["error"] as? String {
+            onError?(error)
         }
     }
+
+    func startRecording() {
+        guard isConnected && configSent && !isRecording else {
+            print("Cannot start recording: connected=\(isConnected), configSent=\(configSent), recording=\(isRecording)")
+            return
+        }
+        
+        print("Starting audio recording...")
+        audioProcessor = AudioProcessor()
+        audioProcessor?.startRecording(
+            onBuffer: { [weak self] pcmData in
+                self?.sendAudioData(pcmData)
+            },
+            completion: { [weak self] result in
+                switch result {
+                case .success():
+                    self?.isRecording = true
+                    self?.onStatusChange?("Recording")
+                    print("✅ Audio recording started successfully")
+                case .failure(let error):
+                    self?.onError?("Failed to start recording: \(error.localizedDescription)")
+                    print("❌ Audio recording failed: \(error)")
+                }
+            }
+        )
+    }
     
-    private func sendOpusData(_ data: Data) {
-        // Send binary data directly to WebSocket
+    func stopRecording() {
+        guard isRecording else { return }
+        
+        print("Stopping audio recording...")
+        audioProcessor?.stopRecording()
+        audioProcessor = nil
+        isRecording = false
+        
+        // Send END message to backend (matches your backend's handleTextMessage)
+        if isConnected {
+            print("Sending END message to backend")
+            socket.send(text: "END")
+        }
+        
+        onStatusChange?("Stopped")
+    }
+
+    private func sendAudioData(_ data: Data) {
+        guard isConnected && isRecording else {
+            print("Cannot send audio: connected=\(isConnected), recording=\(isRecording)")
+            return
+        }
+        
+        guard data.count > 0 else {
+            print("⚠️ Skipping empty audio data")
+            return
+        }
+        
+        print("Sending audio data: \(data.count) bytes")
+        // Send raw PCM data as binary message
         socket.send(data: data)
     }
 }
