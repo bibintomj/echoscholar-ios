@@ -28,6 +28,9 @@ final class SessionViewModel: BaseViewModel {
         }
     }
     
+    @Published var sessionToDelete: Session?
+    @Published var showDeleteConfirmation = false
+    
     @Published var transcript: String = ""
     @Published var translation: String = ""
     @Published var status: String = "Ready"
@@ -40,6 +43,13 @@ final class SessionViewModel: BaseViewModel {
     @Published var translationConfiguration: TranslationSession.Configuration?
     @Published var textToTranslate: [String] = []
     @Published var translatedTexts: [String] = []
+    private var recordedBuffers: [Data] = []
+    private var audioFileURL: URL {
+        let uuid = UUID().uuidString
+        let fileName = "\(uuid).wav"
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return docs.appendingPathComponent(fileName)
+    }
     
     private var isTranslating = false
     private var hasSetupInitialTranslation = false // Add this flag
@@ -91,13 +101,7 @@ final class SessionViewModel: BaseViewModel {
             errorMessage = "Translation is only available on iOS 18 or later."
             return
         }
-        
-//        // Don't recreate if we already have a configuration for this language
-//        if let currentConfig = translationConfiguration,
-//           currentConfig.target?.languageCode?.identifier == targetLanguage {
-//            return
-//        }
-        
+
         // Create translation configuration that will be used by the view
         translationConfiguration = nil
         translationConfiguration = TranslationSession.Configuration(
@@ -159,6 +163,7 @@ final class SessionViewModel: BaseViewModel {
         
         converterNode.installTap(onBus: 0, bufferSize: 1024, format: converterNode.outputFormat(forBus: 0)) { (buffer: AVAudioPCMBuffer!, time: AVAudioTime!) -> Void in
             if let data = self.toData(buffer: buffer) {
+                self.recordedBuffers.append(data)
                 self.socket?.write(data: data)
             }
         }
@@ -188,6 +193,23 @@ final class SessionViewModel: BaseViewModel {
         socket?.disconnect()
         socket = nil
         
+        do {
+            let url = audioFileURL
+            try writeWAVFile(
+                buffers: recordedBuffers,
+                url: url,
+                sampleRate: 48000,
+                channels: 1
+            )
+            // Save session using the new file:
+            Task {
+                await saveSession(audioURL: url)
+            }
+        } catch {
+            errorMessage = "Failed to save audio file: \(error.localizedDescription)"
+        }
+        recordedBuffers.removeAll()
+        
         // Deactivate AVAudioSession
         do {
             try AVAudioSession.sharedInstance().setActive(false)
@@ -216,7 +238,7 @@ final class SessionViewModel: BaseViewModel {
         // Set the text to translate, which will trigger the translationTask
         textToTranslate.append(text)
         
-//        setupTranslationSession(targetLanguage: selectedLang)
+        //        setupTranslationSession(targetLanguage: selectedLang)
         Task {
             await translate()
         }
@@ -251,10 +273,10 @@ final class SessionViewModel: BaseViewModel {
         let slice = textToTranslate[startIndex...]
         
         guard !slice.isEmpty else { return }
-
+        
         let requests: [TranslationSession.Request] = slice.enumerated().map { (offset, text) in
             // Use (startIndex + offset) as the original index in the full array
-            .init(sourceText: text, clientIdentifier: "\(startIndex + offset)")
+                .init(sourceText: text, clientIdentifier: "\(startIndex + offset)")
         }
         
         do {
@@ -283,6 +305,81 @@ final class SessionViewModel: BaseViewModel {
                 errorMessage = "Translation failed: \(error.localizedDescription)"
             }
         }
+    }
+    
+    func saveSession(audioURL: URL) async {
+        setLoading(true)
+        do {
+            let audioData = try Data(contentsOf: audioURL)
+            let uploadData = SaveSession.RequestModel(
+                transcription: transcript,
+                translation: translation,
+                targetLanguage: selectedLang,
+                audioData: audioData,
+                audioFileName: "audio.wav",
+                mimeType: "audio/wav"
+            )
+            let sessionUploadResponse = try await sessionService.saveSession(sessionToUpload: uploadData)
+            
+            setLoading(false)
+        } catch {
+            setLoading(false)
+            errorMessage = "Failed to save session: \(error.localizedDescription)"
+        }
+    }
+    
+    @MainActor
+    func deleteSession(_ id: String) async {
+        do {
+            try await sessionService.deleteSession(sessionId: id)
+            sessions.removeAll { id == $0.id }
+        } catch {
+            print("❌ Failed to delete sessions: \(error)")
+        }
+    }
+
+    
+}
+
+extension SessionViewModel {
+    private func writeWAVFile(buffers: [Data], url: URL, sampleRate: Int, channels: Int) throws {
+        let audioData = Data(buffers.joined())
+        let wavData = createWAVData(from: audioData, sampleRate: sampleRate, channels: channels)
+        try wavData.write(to: url)
+    }
+    
+    // Helper to make WAV header + PCM data
+    private func createWAVData(from pcmData: Data, sampleRate: Int, channels: Int) -> Data {
+        let byteRate = sampleRate * channels * 2 // 16 bits = 2 bytes
+        let blockAlign = channels * 2
+        let fileLength = UInt32(pcmData.count) + 44 - 8
+        
+        var header = Data()
+        header.append("RIFF".data(using: .utf8)!)
+        header.append(UInt32(fileLength).littleEndian.data)
+        header.append("WAVE".data(using: .utf8)!)
+        header.append("fmt ".data(using: .utf8)!)
+        header.append(UInt32(16).littleEndian.data)          // Subchunk1Size
+        header.append(UInt16(1).littleEndian.data)           // AudioFormat PCM = 1
+        header.append(UInt16(channels).littleEndian.data)
+        header.append(UInt32(sampleRate).littleEndian.data)
+        header.append(UInt32(byteRate).littleEndian.data)
+        header.append(UInt16(blockAlign).littleEndian.data)
+        header.append(UInt16(16).littleEndian.data)          // BitsPerSample
+        header.append("data".data(using: .utf8)!)
+        header.append(UInt32(pcmData.count).littleEndian.data)
+        var wavData = Data()
+        wavData.append(header)
+        wavData.append(pcmData)
+        return wavData
+    }
+    
+}
+
+private extension FixedWidthInteger {
+    var data: Data {
+        var value = self
+        return Data(bytes: &value, count: MemoryLayout<Self>.size)
     }
 }
 

@@ -145,17 +145,6 @@ struct SessionDetailView: View {
         .background(Color("background.primary").ignoresSafeArea())
         .navigationTitle(viewModel.selectedSession?.transcriptions?.content.prefix(10) ?? "Untitled")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Button {
-                    // Handle favorite
-                } label: {
-                    Image(systemName: "sparkles")
-                        .foregroundColor(.yellow)
-                        .font(.title3)
-                }
-            }
-        }
         .sheet(isPresented: $isSharePresented) {
             ShareSheet(activityItems: [shareContent])
         }

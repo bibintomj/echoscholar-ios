@@ -13,8 +13,8 @@ import NetSwift
 
 struct LoginView: View {
     @EnvironmentObject var appState: AppState
-    @State private var email = "abc@mail.com"
-    @State private var password = "Pass@123"
+    @State private var email = "bibintomj@gmail.com"
+    @State private var password = "Pass@1234"
     @State private var isLoadingEmail = false
     @State private var isLoadingGoogle = false
     @State private var loginError: String?

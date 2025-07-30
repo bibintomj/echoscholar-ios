@@ -107,6 +107,63 @@ public final class NetworkClient {
         }
     }
     
+    public func stream<T: Decodable>(
+        _ request: NetworkRequest,
+        linePrefix: String = "0:",
+        until terminator: String = "d:",
+        onElement: @escaping (T) -> Void
+    ) async throws {
+        let urlRequest = try await requestBuilder.build(from: request)
+        logRequest(urlRequest)
+
+        let (stream, response) = try await URLSession.shared.bytes(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw NetworkError.invalidResponse
+        }
+
+        for try await line in stream.lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // ✅ Handle terminator (optional)
+            if trimmed.hasPrefix(terminator) {
+                // optional: decode done metadata here
+                break
+            }
+
+            // ✅ Handle streaming tokens like: 0:" today"
+            if trimmed.hasPrefix(linePrefix) {
+                let value = trimmed.replacingOccurrences(of: linePrefix, with: "")
+
+                if T.self == String.self {
+                    let unquoted = value.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+                    if let result = unquoted as? T {
+                        onElement(result)
+                    }
+                    continue
+                }
+
+                // If using a model like ChunkResponse
+                let json = #"{"0":\#(value)}"#
+                guard let data = json.data(using: .utf8) else { continue }
+
+                do {
+                    let decoded = try decoder.decode(T.self, from: data)
+                    onElement(decoded)
+                } catch {
+                    logStreamDecodeError(raw: json, error: error)
+                }
+
+                continue
+            }
+
+            // 🟡 Unmatched line
+            logStreamDecodeError(raw: line, error: NetworkError.decodingError(NSError(domain: "stream", code: 0)))
+        }
+    }
+
+
+
     // MARK: - Upload Methods
     public func uploadBinary<T: Decodable>(_ request: RawFileUploadRequest) async throws -> T {
         let urlRequest = try await requestBuilder.build(from: request)
@@ -268,6 +325,15 @@ public final class NetworkClient {
         
         print("----------------------------------------")
     }
+    
+    private func logStreamDecodeError(raw: String, error: Error) {
+        guard debugLoggingEnabled else { return }
+        print("\n🌐⚠️ [STREAMING DECODE ERROR]")
+        print("Raw: \(raw)")
+        print("Error: \(error.localizedDescription)")
+        print("----------------------------------------")
+    }
+
     
     private func prettyPrint(_ value: Any) {
         // If the object is Encodable, encode it to JSON and print it nicely

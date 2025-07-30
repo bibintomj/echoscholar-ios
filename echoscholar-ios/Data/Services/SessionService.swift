@@ -34,4 +34,24 @@ class SessionService {
             throw error
         }
     }
+    
+    func saveSession(sessionToUpload: SaveSession.RequestModel) async throws -> SaveSession.Response {
+        let request = UploadEndpoint.saveSession(uploadItem: sessionToUpload)
+        do {
+            let response: SaveSession.Response = try await networkClient.uploadMultipart(request)
+            return response
+        } catch let error as NetworkError {
+            throw error
+        }
+    }
+    
+    func deleteSession(sessionId: String) async throws {
+        let request = SessionEndpoint.deleteSession(sessionId: sessionId)
+        do {
+            let response: Generic.Response = try await networkClient.request(request)
+            return
+        } catch let error as NetworkError {
+            throw error
+        }
+    }
 }

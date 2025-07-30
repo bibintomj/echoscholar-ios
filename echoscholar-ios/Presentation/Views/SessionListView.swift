@@ -14,6 +14,7 @@ struct SessionListView: View {
     
     @StateObject var viewModel: SessionViewModel
     
+    
     init(viewModel: SessionViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
@@ -23,7 +24,7 @@ struct SessionListView: View {
             Color("background.primary")
                 .ignoresSafeArea()
             
-            if viewModel.isLoading {
+            if viewModel.isLoading && viewModel.sessions.isEmpty {
                 ProgressView("Loading sessions...")
                     .foregroundColor(.white)
             } else {
@@ -54,10 +55,22 @@ struct SessionListView: View {
                             viewModel.selectedSession = session
                             appState.navigateTo(.sessionDetail)
                         }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                viewModel.sessionToDelete = session
+                                viewModel.showDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                                    .foregroundStyle(.black)
+//                                    .backgroundStyle(.fill(Color.red))
+                            }
+                        }
                     }
-                    
                 }
                 .scrollContentBackground(.hidden)
+                .refreshable {
+                    await refreshSessions()
+                }
             }
             
             ESButton(
@@ -75,6 +88,15 @@ struct SessionListView: View {
         .navigationBarTitleDisplayMode(.large)
         .navigationBarBackButtonHidden(true)
         .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    appState.navigateTo(.chat)
+                } label: {
+                    Image(systemName: "sparkles")
+                        .foregroundColor(.yellow)
+                        .font(.title3)
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button("Logout", role: .destructive) {
@@ -110,9 +132,28 @@ struct SessionListView: View {
         .onChange(of: viewModel.shouldLogout) { oldValue, newValue in
             if newValue { logout() }
         }
+        .confirmationDialog("Are you sure you want to delete this session?",
+                            isPresented: $viewModel.showDeleteConfirmation,
+                            titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let session = viewModel.sessionToDelete {
+                    Task {
+                        await viewModel.deleteSession(session.id)
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.sessionToDelete = nil
+            }
+        }
     }
     
-    
+    private func refreshSessions() async {
+        viewModel.loadSessions()
+        
+        // Small delay to ensure the refresh animation completes smoothly
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+    }
     
     private func logout() {
         Task {
@@ -131,9 +172,6 @@ struct SessionListView: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
-
-
-
 
 #Preview {
     SessionListView(viewModel: .init())

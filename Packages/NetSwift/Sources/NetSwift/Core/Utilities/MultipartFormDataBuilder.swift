@@ -20,20 +20,30 @@ struct MultipartFormDataBuilder {
         with fileData: Data,
         fileName: String,
         mimeType: String,
+        fileFieldName: String = "file",
         formFields: [String: String]?
     ) -> Data {
         var body = Data()
         
+        print("\n--- MultipartFormDataBuilder: BEGIN BUILD ---")
+        print("Field Name for File: \(fileFieldName)")
+        print("File Name: \(fileName)")
+        print("MIME Type: \(mimeType)")
+        print("File Size: \(fileData.count) bytes")
+        print("Boundary: \(boundary)")
+        
         // Add form fields (if any)
         formFields?.forEach { key, value in
+            print("  [\(key)] = \(value)")
             body.append("--\(boundary)\r\n")
             body.append("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n")
             body.append("\(value)\r\n")
         }
         
+        print("Appending file data with field name [\(fileFieldName)] and filename [\(fileName)]")
         // Add file data
         body.append("--\(boundary)\r\n")
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n")
+        body.append("Content-Disposition: form-data; name=\"\(fileFieldName)\"; filename=\"\(fileName)\"\r\n")
         body.append("Content-Type: \(mimeType)\r\n\r\n")
         body.append(fileData)
         body.append("\r\n")

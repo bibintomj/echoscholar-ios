@@ -121,4 +121,5 @@ enum Route: Hashable {
     case sessionDetail
     case newSession
     case account
+    case chat
 }
