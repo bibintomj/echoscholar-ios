@@ -87,10 +87,17 @@ struct SessionListView: View {
         .navigationTitle("Your Sessions")
         .navigationBarTitleDisplayMode(.large)
         .navigationBarBackButtonHidden(true)
+        .sheet(isPresented: $viewModel.showPricingPage) {
+            PricingView()
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
-                    appState.navigateTo(.chat)
+                    if appState.isPro {
+                        appState.navigateTo(.chat)
+                    } else {
+                        viewModel.showPricingPage = true
+                    }
                 } label: {
                     Image(systemName: "sparkles")
                         .foregroundColor(.yellow)
@@ -126,6 +133,10 @@ struct SessionListView: View {
         .onAppear {
             if viewModel.sessions.isEmpty {
                 viewModel.loadSessions()
+                Task {
+                    let status = await viewModel.loadSubscriptionStatus()
+                    appState.isPro = status
+                }
             }
             viewModel.generatedMoM = nil
         }

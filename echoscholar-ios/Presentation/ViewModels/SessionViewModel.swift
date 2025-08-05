@@ -28,6 +28,8 @@ final class SessionViewModel: BaseViewModel {
         }
     }
     
+    @Published var showPricingPage = false
+    
     @Published var sessionToDelete: Session?
     @Published var showDeleteConfirmation = false
     
@@ -338,7 +340,20 @@ final class SessionViewModel: BaseViewModel {
         }
     }
 
-    
+    func loadSubscriptionStatus() async -> Bool {
+        guard let userId = supabase.auth.currentSession?.user.id.uuidString else {
+            return false
+        }
+        let request = UserEndpoints.subscription(userId: userId)
+        let networkClient = NetworkClient(requestBuilder: ProtectedRequestBuilder())
+        do {
+            let response: SubscriptionStatus.Response = try await networkClient.request(request)
+            return response.isActive
+        } catch {
+            print(error.localizedDescription)
+            return false
+        }
+    }
 }
 
 extension SessionViewModel {
