@@ -14,7 +14,8 @@ let supabase = SupabaseClient(
     supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0dXdiYXZkbnFma3loaGR6cHZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NzYyMTgsImV4cCI6MjA2MzI1MjIxOH0.ifnO2cTnTEqCJAmNAaX0UdTmpp5y1DOIlh4HiDBXAY4"
 )
 
-let hostURL = "10.0.0.64"
+let hostURL = "echoscholar-web-production-59f5.up.railway.app"
+//let hostURL = "10.0.0.64"
 //let hostURL = "10.192.25.96"
 //let hostURL = "10.192.12.217"
 

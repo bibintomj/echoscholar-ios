@@ -106,6 +106,10 @@ struct SessionListView: View {
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
+                    Button("Profile") {
+                        appState.navigateTo(.account)
+                    }
+                    
                     Button("Logout", role: .destructive) {
                         logout()
                     }
@@ -125,7 +129,7 @@ struct SessionListView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 20, height: 20)
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.foregroundPrimary)
                     }
                 }
             }

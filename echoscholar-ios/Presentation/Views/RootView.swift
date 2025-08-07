@@ -39,7 +39,7 @@ struct RootView: View {
         case .sessionList: SessionListView(viewModel: appState.makeSessionViewModel())
         case .sessionDetail: SessionDetailView(viewModel: appState.makeSessionViewModel())
         case .newSession: NewSessionView()
-        case .account: EmptyView()
+        case .account: ProfileView()
         case .chat: ChatView()
 //        case .splash: SplashView()
 //        case .onboarding: OnboardView()
